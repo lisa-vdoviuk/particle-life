@@ -16,33 +16,28 @@ This project implements a dynamic particle system where thousands of particles i
 
 - ⚡ Experience with Python runtime optimization
 
-**Features**
-
 -------------------------------------------------------------------------
+
+**Features**
 
 - Core Simulation
   
-- Dynamic Particle System with thousands of interacting particles
+- Dynamic Particle System with interacting particles
 
 - Multiple Particle Types (minimum 4) with unique colors and behaviors
 
 - Interaction Matrix defining attraction/repulsion between different particle types
 
-- Real-time Visualization supporting 2,000+ particles
+- Real-time Visualization
 
-- Configurable Parameters: interaction strength, influence range, friction, random motion
+- Configurable Parameters: interaction strength, influence range, friction, random motion (optional)
 
 
 -----------------------------------------------------------------------
 
-**Technical Excellence**
+**Diagram**
 
-✅ Clean Code following PEP standards and linting rules
+<img width="1640" height="2618" alt="UML class" src="https://github.com/user-attachments/assets/a26126cb-2cf2-4482-a6ac-8327a442b37a" />
 
-✅ Comprehensive Testing with >70% code coverage using pytest
 
-✅ CI/CD Pipeline with GitHub Actions (Windows, MacOS, Ubuntu)
 
-✅ Performance Optimized using profiling and advanced techniques
-
-✅ Professional Documentation with detailed docstrings
