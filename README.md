@@ -37,7 +37,6 @@ This project implements a dynamic particle system where thousands of particles i
 
 **Diagram**
 
-<img width="1640" height="2618" alt="UML class" src="https://github.com/user-attachments/assets/a26126cb-2cf2-4482-a6ac-8327a442b37a" />
-
+<img width="1640" height="2618" alt="output-onlinepngtools" src="https://github.com/user-attachments/assets/1ef721c4-9ef0-49b4-824f-39fe6f88e93c" />
 
 
