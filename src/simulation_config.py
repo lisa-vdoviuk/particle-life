@@ -44,7 +44,7 @@ class SimulationConfig:
         if not self.particle_colors:
             # default colors if none provided
             default_colors = ["red", "green", "yellow", "blue", "magenta", "cyan"]
-            self.particle_colors = default_colors[:, self.num_types]
+            self.particle_colors = default_colors[: self.num_types]
 
         # initialize matrix with zeroes
         self._init_interaction_matrix(default_value=0.0)
