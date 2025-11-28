@@ -4,13 +4,14 @@ from typing import List, Dict, Any, Sequence
 import random
 import math
 from dataclasses import dataclass
-@dataclass
 
+@dataclass
 class ParticleSystem:
     particles: List[Particle]
     config: SimulationConfig
     width: int
     height: int
+    
     def add_particles(self, count: int, types: List[int]):
         for i in range(count):
            #random position inside simulation bounds
@@ -34,7 +35,6 @@ class ParticleSystem:
            )
            #adds the particle to the list
            self.particles.append(p)
-
 
     def update_system(self, dt:float):
         #calculate forces for all particles and update their velocities
@@ -63,9 +63,8 @@ class ParticleSystem:
                 #calculates the direction vectors
                 dir_x = dx / dist
                 dir_y = dy / dist
-                #coefficient from the interaction matrix
-                #k = 5.0
-                k = self.config.interaction_matrix[type_i][type_j]
+                #coefficient from the interaction matrix - ВИКОРИСТОВУЄМО НОВИЙ МЕТОД
+                k = self.config.get_interaction(type_i, type_j)  # Змінили тут
                 #no actions -> continue
                 if k == 0:
                     continue
@@ -75,10 +74,6 @@ class ParticleSystem:
                 force_x += dir_x * strength
                 force_y += dir_y * strength
             i.apply_force(force_x, force_y)   
-
-
-
-
 
     def get_particles_data(self) -> List[dict]:
         #creates the empty list for the parictles data
@@ -96,9 +91,7 @@ class ParticleSystem:
             #adds the particle data to the list
             result.append(particle_data)
         return result
+        
     def reset_system(self):
         #clears all particles from the system
         self.particles.clear()
-
-
-
