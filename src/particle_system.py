@@ -63,8 +63,8 @@ class ParticleSystem:
                 #calculates the direction vectors
                 dir_x = dx / dist
                 dir_y = dy / dist
-                #coefficient from the interaction matrix - ВИКОРИСТОВУЄМО НОВИЙ МЕТОД
-                k = self.config.get_interaction(type_i, type_j)  # Змінили тут
+                #coefficient from the interaction matrix
+                k = self.config.get_interaction(type_i, type_j)
                 #no actions -> continue
                 if k == 0:
                     continue

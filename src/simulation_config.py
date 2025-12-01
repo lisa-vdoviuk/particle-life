@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Sequence
 import json
 import os
-from interaction_matrix import InteractionMatrix  # Додаємо імпорт
+from interaction_matrix import InteractionMatrix
 
 @dataclass
 class SimulationConfig:
@@ -39,7 +39,7 @@ class SimulationConfig:
     random_motion: float = 0.01
 
     particle_colors: List[str] = field(default_factory=list)
-    interaction_matrix: InteractionMatrix = field(init=False)  # Змінили тип
+    interaction_matrix: InteractionMatrix = field(init=False)
 
     def __post_init__(self) -> None:
         if not self.particle_colors:
@@ -101,7 +101,7 @@ class SimulationConfig:
             "interaction_radius": self.interaction_radius,
             "random_motion": self.random_motion,
             "particle_colors": self.particle_colors,
-            "interaction_matrix": self.interaction_matrix.matrix,  # Зберігаємо матрицю як список
+            "interaction_matrix": self.interaction_matrix.matrix,
         }
     
     @classmethod
@@ -120,7 +120,7 @@ class SimulationConfig:
 
         matrix_data = data.get("interaction_matrix")
         if matrix_data is not None:
-            # Завантажуємо матрицю з даних
+            # Upload matrix from data
             for i in range(num_types):
                 for j in range(num_types):
                     if i < len(matrix_data) and j < len(matrix_data[i]):
@@ -144,7 +144,7 @@ class SimulationConfig:
         # Load configuration from a JSON file
         if not os.path.exists(file_path):
             raise FileNotFoundError(file_path)
-        with open(file_path, "r", encoding="utf-8") as f:  # Виправили typo: "urf-8" -> "utf-8"
+        with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         return cls.from_dict(data)
