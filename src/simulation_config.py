@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Sequence
 import json
 import os
+from interaction_matrix import InteractionMatrix
 
 @dataclass
 class SimulationConfig:
@@ -13,8 +14,8 @@ class SimulationConfig:
     num_types: int 
         How many different particle types exist
 
-    interaction_matrix: List[List[float]]
-        interaction_matrix[i][j] describes how particles of type i
+    interaction_matrix: InteractionMatrix
+        Handles interactions between particle types
     
     particle_colors: list of str
         Color for each particle type. Length must be >= num_types
@@ -29,7 +30,7 @@ class SimulationConfig:
         Maximum distance where forces between particles are applied
 
     random_motion: float
-        Additional random “jitter” added to particle velocities
+        Additional random "jitter" added to particle velocities
     """
     num_types: int = 4
     friction: float = 0.1
@@ -38,7 +39,7 @@ class SimulationConfig:
     random_motion: float = 0.01
 
     particle_colors: List[str] = field(default_factory=list)
-    interaction_matrix: List[List[float]] = field(init=False)
+    interaction_matrix: InteractionMatrix = field(init=False)
 
     def __post_init__(self) -> None:
         if not self.particle_colors:
@@ -46,33 +47,16 @@ class SimulationConfig:
             default_colors = ["red", "green", "yellow", "blue", "magenta", "cyan"]
             self.particle_colors = default_colors[: self.num_types]
 
-        # initialize matrix with zeroes
-        self._init_interaction_matrix(default_value=0.0)
+        # initialize interaction matrix
+        self.interaction_matrix = InteractionMatrix(self.num_types)
     
     # -------------- helpers ------------------
 
-    def _init_interaction_matrix(self, default_value: float = 0.0) -> None:
-        self.interaction_matrix = [
-            [float(default_value) for _ in range(self.num_types)]
-            for _ in range(self.num_types)
-        ]
     def _validate_type_index(self, t: int)->None:
         if not(0<=t<self.num_types):
             raise IndexError(
                 f"Particle type index {t} out of range [0,{self.num_types- 1 }]"
             )
-    def _validate_matrix_shape(self, matrix: Sequence[Sequence[Any]]) -> None:
-        if len(matrix) != self.num_types:
-            raise ValueError(
-                f"Interaction matrix must have {self.num_types} rows "
-                f"(got {len(matrix)})"
-            )
-        for row in matrix:
-            if len(row)!= self.num_types:
-                raise ValueError(
-                    "Interaction matrix must be square "
-                    f"({self.num_types} x {self.num_types})"
-                )
 
     # ----------------- API for interaction matrix -----------------
 
@@ -80,15 +64,19 @@ class SimulationConfig:
         # Returns interaction strength from type1 to type2
         self._validate_type_index(type1)
         self._validate_type_index(type2)
-        return self.interaction_matrix[type1][type2]
+        return self.interaction_matrix.get_interaction(type1, type2)
     
     def set_interaction(self, type1: int, type2: int, value: float)->None:
         # Set interaction strength from type1 to type2
         self._validate_type_index(type1)
         self._validate_type_index(type2)
-        self.interaction_matrix[type1][type2]=float(value)
+        self.interaction_matrix.set_interaction(type1, type2, float(value))
     
-    #-------------- parameter update (for GUI) ----------------------
+    def randomize_interactions(self) -> None:
+        """Randomize all interactions in the matrix"""
+        self.interaction_matrix.randomize()
+
+    # -------------- parameter update (for GUI) ----------------------
 
     def update_parameter(self, param_name: str, value: float) -> None:
         if not hasattr(self, param_name):
@@ -113,12 +101,13 @@ class SimulationConfig:
             "interaction_radius": self.interaction_radius,
             "random_motion": self.random_motion,
             "particle_colors": self.particle_colors,
-            "interaction_matrix": self.interaction_matrix,
+            "interaction_matrix": self.interaction_matrix.matrix,
         }
+    
     @classmethod
     def from_dict(cls, data: dict)-> "SimulationConfig":
         # Create a SimulationConfig from a dict (inverse of to_dict())
-        num_types = int(data.get("num_types",4))
+        num_types = int(data.get("num_types", 4))
 
         cfg = cls(
             num_types=num_types,
@@ -129,13 +118,13 @@ class SimulationConfig:
             particle_colors=list(data.get("particle_colors", [])),
         )
 
-        matrix = data.get("interaction_matrix")
-
-        if matrix is not None:
-            cfg._validate_matrix_shape(matrix)
+        matrix_data = data.get("interaction_matrix")
+        if matrix_data is not None:
+            # Upload matrix from data
             for i in range(num_types):
                 for j in range(num_types):
-                    cfg.interaction_matrix[i][j] = float(matrix[i][j])
+                    if i < len(matrix_data) and j < len(matrix_data[i]):
+                        cfg.set_interaction(i, j, float(matrix_data[i][j]))
         
         return cfg
     
@@ -155,7 +144,7 @@ class SimulationConfig:
         # Load configuration from a JSON file
         if not os.path.exists(file_path):
             raise FileNotFoundError(file_path)
-        with open(file_path, "r", encoding = "urf-8") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         return cls.from_dict(data)
