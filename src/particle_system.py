@@ -24,6 +24,8 @@ class ParticleSystem:
            vy = 1
            #color 
            color = self.config.particle_colors[particle_type]
+           #mass 1.0 for test
+           mass = 1.0
            #creates the particle
            p = Particle(
                particle_type = particle_type,
@@ -31,20 +33,21 @@ class ParticleSystem:
                position_y = y,
                velocity_x = vx,
                velocity_y = vy,
-               color = color
+               color = color,
+               mass = mass
            )
            #adds the particle to the list
            self.particles.append(p)
 
     def update_system(self, dt:float):
         #calculate forces for all particles and update their velocities
-        self.calculate_forces()
+        self.calculate_forces(dt)
         #updates the positions
         for particle in self.particles:
             particle.update_position(dt)
 
         
-    def calculate_forces(self):
+    def calculate_forces(self,dt):
         for i in self.particles:
             force_x = 0.0
             force_y = 0.0
@@ -70,10 +73,15 @@ class ParticleSystem:
                     continue
                 #calculates the strenght(without the direction)
                 strength = k / dist
+                #calculates gravity, grav is gravity constant
+                grav = 0.1
+                gravity = grav * i.mass * j.mass * (1 / (dist * dist))
                 #calculates the general force
                 force_x += dir_x * strength
+                force_x += dir_x * gravity
                 force_y += dir_y * strength
-            i.apply_force(force_x, force_y)   
+                force_y += dir_y * gravity
+            i.apply_force(force_x, force_y,dt)   
 
     def get_particles_data(self) -> List[dict]:
         #creates the empty list for the parictles data
@@ -86,7 +94,8 @@ class ParticleSystem:
                 "vx": i.velocity_x,
                 "vy": i.velocity_y,
                 "type": i.particle_type,
-                "color": i.color
+                "color": i.color,
+                "mass" : i.mass
             }
             #adds the particle data to the list
             result.append(particle_data)
