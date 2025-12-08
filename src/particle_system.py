@@ -1,97 +1,111 @@
 from particle_class import Particle
 from simulation_config import SimulationConfig
-from typing import List, Dict, Any, Sequence
+from typing import List, Dict
 import random
 import math
-from dataclasses import dataclass
 
-@dataclass
 class ParticleSystem:
-    particles: List[Particle]
-    config: SimulationConfig
-    width: int
-    height: int
+    def __init__(self, particles: List[Particle], config: SimulationConfig, width: int, height: int):
+        self.particles = particles
+        self.config = config
+        self.width = width
+        self.height = height
     
     def add_particles(self, count: int, types: List[int]):
-        for i in range(count):
-           #random position inside simulation bounds
-           particle_type = random.choice(types)
-           #random height and width
-           x = random.randint(0,self.width)
-           y = random.randint(0,self.height)
-           #starting velocity (set to 1 for visible movement in console)
-           vx = 1
-           vy = 1
-           #color 
-           color = self.config.particle_colors[particle_type]
-           #creates the particle
-           p = Particle(
-               particle_type = particle_type,
-               position_x = x,
-               position_y = y,
-               velocity_x = vx,
-               velocity_y = vy,
-               color = color
-           )
-           #adds the particle to the list
-           self.particles.append(p)
-
-    def update_system(self, dt:float):
-        #calculate forces for all particles and update their velocities
+        """Adds particles with positions and types"""
+        for _ in range(count):
+            particle_type = random.choice(types)
+            x = random.uniform(0, self.width)
+            y = random.uniform(0, self.height)
+            
+            # Minimum starting velocity
+            vx = random.uniform(-0.5, 0.5)
+            vy = random.uniform(-0.5, 0.5)
+            
+            color = self.config.particle_colors[particle_type]
+            
+            p = Particle(
+                particle_type=particle_type,
+                position_x=x,
+                position_y=y,
+                velocity_x=vx,
+                velocity_y=vy,
+                color=color
+            )
+            self.particles.append(p)
+    
+    def update_system(self, dt: float):
+        """Updated the whole system"""
         self.calculate_forces()
-        #updates the positions
         for particle in self.particles:
-            particle.update_position(dt)
-
-        
+            particle.update_position(
+                dt,
+                self.config.friction,
+                self.config.max_velocity,
+                self.config.random_motion
+            )
+    
     def calculate_forces(self):
+        """Calculates the forces between all the particles"""
         for i in self.particles:
             force_x = 0.0
             force_y = 0.0
+            
             for j in self.particles:
-                if j == i:
+                if j is i: # skip itself
                     continue
-                type_i = i.particle_type
-                type_j = j.particle_type
-                #calculates the vectors (x -> left or right, y -> up or down)
-                dx = j.position_x- i.position_x
+                
+                # Value from interaction matrix
+                k = self.config.get_interaction(i.particle_type, j.particle_type)
+                if abs(k) < 0.001:
+                    continue
+                
+                # Calculation of direction and distance
+                dx = j.position_x - i.position_x
                 dy = j.position_y - i.position_y
-                #calculates the distance between the particles
-                dist = math.sqrt(dx*dx + dy*dy)
-                if dist < 0.001:
+                dist_squared = dx*dx + dy*dy
+                dist = math.sqrt(dist_squared)
+                
+                
+                if dist > self.config.interaction_radius:
                     continue
-                #calculates the direction vectors
+                
+                if dist < 0.001:  # Avoid dividing by zero
+                    continue
+                
+                
                 dir_x = dx / dist
                 dir_y = dy / dist
-                #coefficient from the interaction matrix
-                k = self.config.get_interaction(type_i, type_j)
-                #no actions -> continue
-                if k == 0:
-                    continue
-                #calculates the strenght(without the direction)
-                strength = k / dist
-                #calculates the general force
+                
+                # MY OFFER OF THE FORMULA:
+                # Force = interaction_matrix_value × linear_decay_with_distance
+                # Linear_decay: 1 - (dist / interaction_radius)
+                linear_decay = 1.0 - (dist / self.config.interaction_radius)
+                strength = k * linear_decay
+                
+                # Add the force
                 force_x += dir_x * strength
                 force_y += dir_y * strength
-            i.apply_force(force_x, force_y)   
-
-    def get_particles_data(self) -> List[dict]:
-        #creates the empty list for the parictles data
+            
+            # Apply the force for a particle
+            i.apply_force(force_x, force_y)
+    
+    def get_particles_data(self) -> List[Dict]:
+        """Return the data for visualization"""
         result = []
-        for i in self.particles:
-            #creates the dict for every particle
+        for p in self.particles:
             particle_data = {
-                "x": i.position_x,
-                "y": i.position_y,
-                "vx": i.velocity_x,
-                "vy": i.velocity_y,
-                "type": i.particle_type,
-                "color": i.color
+                "x": p.position_x,
+                "y": p.position_y,
+                "vx": p.velocity_x,
+                "vy": p.velocity_y,
+                "type": p.particle_type,
+                "color": p.color
+                
             }
-            #adds the particle data to the list
             result.append(particle_data)
         return result
-        
+    
     def reset_system(self):
-        #clears all particles from the system
+        """Resets the system"""
         self.particles.clear()
