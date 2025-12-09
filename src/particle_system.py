@@ -58,7 +58,7 @@ class ParticleSystem:
         radius_squared = interaction_radius * interaction_radius
 
         for i in particles:
-            # локальні змінні для меншої кількості звернень до атрибутів
+           
             xi = i.position_x
             yi = i.position_y
             ti = i.particle_type
@@ -78,7 +78,7 @@ class ParticleSystem:
                 dy = j.position_y - yi
                 dist_squared = dx * dx + dy * dy
 
-                # відсікаємо дуже близькі та занадто далекі пари без sqrt
+                
                 if dist_squared < 1e-6 or dist_squared > radius_squared:
                     continue
 
