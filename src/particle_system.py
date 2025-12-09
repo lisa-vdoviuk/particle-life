@@ -44,51 +44,57 @@ class ParticleSystem:
                 self.config.max_velocity,
                 self.config.random_motion
             )
+
+            # keep particles inside the simulation area (wrap-around)
+            particle.position_x %= self.width
+            particle.position_y %= self.height
+
     
     def calculate_forces(self):
-        """Calculates the forces between all the particles"""
-        for i in self.particles:
+        """Calculates the forces between all the particles (optimized)."""
+        particles = self.particles
+        get_interaction = self.config.get_interaction
+        interaction_radius = self.config.interaction_radius
+        radius_squared = interaction_radius * interaction_radius
+
+        for i in particles:
+            # локальні змінні для меншої кількості звернень до атрибутів
+            xi = i.position_x
+            yi = i.position_y
+            ti = i.particle_type
+
             force_x = 0.0
             force_y = 0.0
-            
-            for j in self.particles:
-                if j is i: # skip itself
+
+            for j in particles:
+                if j is i:
                     continue
-                
-                # Value from interaction matrix
-                k = self.config.get_interaction(i.particle_type, j.particle_type)
+
+                k = get_interaction(ti, j.particle_type)
                 if abs(k) < 0.001:
                     continue
-                
-                # Calculation of direction and distance
-                dx = j.position_x - i.position_x
-                dy = j.position_y - i.position_y
-                dist_squared = dx*dx + dy*dy
+
+                dx = j.position_x - xi
+                dy = j.position_y - yi
+                dist_squared = dx * dx + dy * dy
+
+                # відсікаємо дуже близькі та занадто далекі пари без sqrt
+                if dist_squared < 1e-6 or dist_squared > radius_squared:
+                    continue
+
                 dist = math.sqrt(dist_squared)
-                
-                
-                if dist > self.config.interaction_radius:
-                    continue
-                
-                if dist < 0.001:  # Avoid dividing by zero
-                    continue
-                
-                
+
                 dir_x = dx / dist
                 dir_y = dy / dist
-                
-                # MY OFFER OF THE FORMULA:
-                # Force = interaction_matrix_value × linear_decay_with_distance
-                # Linear_decay: 1 - (dist / interaction_radius)
-                linear_decay = 1.0 - (dist / self.config.interaction_radius)
+
+                linear_decay = 1.0 - (dist / interaction_radius)
                 strength = k * linear_decay
-                
-                # Add the force
+
                 force_x += dir_x * strength
                 force_y += dir_y * strength
-            
-            # Apply the force for a particle
+
             i.apply_force(force_x, force_y)
+
     
     def get_particles_data(self) -> List[Dict]:
         """Return the data for visualization"""
