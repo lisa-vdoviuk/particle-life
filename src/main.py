@@ -52,7 +52,7 @@ def configure_matrix_from_console(config: SimulationConfig) -> None:
                 except ValueError:
                     print("Enter a number, for example: 0.3, -0.7, 1, 0...")
 
-    print("\nInteraction matrix збережена в конфігурації.")
+    print("\nInteraction matrix is saved in configuration.")
 
 
 def save_preset(config: SimulationConfig) -> None:
