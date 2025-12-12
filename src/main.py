@@ -64,7 +64,7 @@ def save_preset(config: SimulationConfig) -> None:
     if not name:
         name = "preset1"
     file_path = os.path.join(PRESETS_DIR, f"{name}.json")
-    
+
     config.save_config(file_path)
     print(f"Preset was saved in: {file_path}")
 
@@ -98,7 +98,7 @@ def load_preset():
             idx = int(choice)
             if 0 <= idx < len(files):
                 file_path = os.path.join(PRESETS_DIR, files[idx])
-                
+
                 cfg = SimulationConfig.load_config(file_path)
                 print(f"Preset: {files[idx]} has loaded")
                 return cfg
@@ -121,13 +121,13 @@ def create_or_load_config() -> SimulationConfig:
             return cfg
         print("Preset was no chosen.")
 
-    # Create new config
+    
     cfg = SimulationConfig()
 
-
-    cfg.friction = 0.02        
-    cfg.max_velocity = 6.0    
-    cfg.random_motion = 0.05   
+    
+    cfg.friction = 0.02
+    cfg.max_velocity = 6.0
+    cfg.random_motion = 0.05
 
     configure_matrix_from_console(cfg)
 
@@ -142,13 +142,11 @@ def create_or_load_config() -> SimulationConfig:
 
 
 def main() -> None:
-    # Window size
-    width, height = 800, 600
-
     
+    width, height = 1920, 1080
+
     config = create_or_load_config()
 
-    
     system = ParticleSystem(
         particles=[],
         config=config,
@@ -156,13 +154,11 @@ def main() -> None:
         height=height,
     )
 
-    
     types = list(range(config.num_types))
 
-   
-    system.add_particles(count=100, types=types)
-
     
+    system.add_particles(count=300, types=types)
+
     visualizer = Visualizer(
         system,
         width,
