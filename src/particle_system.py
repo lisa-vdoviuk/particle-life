@@ -59,34 +59,30 @@ class ParticleSystem:
             )
             
             # keep particles inside the simulation area (wrap-around)
-            if particle.position_x < 0: 
-                particle.position_x += w
-            elif particle.position_x >= w:
-                particle.position_x -= w
-            
-            if particle.position_y < 0: 
-                particle.position_y += h
-            elif particle.position_y >= h:
-                particle.position_y -= h
+            particle.position_x %= self.width
+            particle.position_y %= self.height
 
     
     def calculate_forces(self):
-        """Calculates the forces between all the particles (optimized)."""
+        """Calculates the forces between all the particles using a uniform grid (spatial hashing)."""
         particles = self.particles
         config = self.config
         # locals for the faster optimisation
         sqrt = math.sqrt
-        interaction_matrix = config.interaction_matrix.matrix  
-
+        interaction_matrix = config.interaction_matrix.matrix
+        
+        #interaction radius (distance)
         r = float(config.interaction_radius)
         if r <= 0.0:
             return
-        radius_squared = r * r
-        inv_r = 1.0 / r
+        
+        radius_squared = r * r # compare squared distances to avoid sqrt when possible
+        inv_r = 1.0 / r # precompute the inverse of interaction radius for the optimisation
 
+        #we use cell size as r so we only check the currenct cell all the neighbor cells
         cell_size = r
-        inv_cell = 1.0 / cell_size
-        cell_range = 1
+        inv_cell = 1.0 / cell_size # precompute the inverse cell for the optimisation
+        cell_range = 1 # checks 1 cell away, -> 3x3 blocks(currecnt cell + 8 neighbor cells)
 
         # creates the dict with all the particales cells location
         grid = self._grid
@@ -99,16 +95,20 @@ class ParticleSystem:
             if key not in grid:
                 grid[key] = []
             grid[key].append(p)
-
+        
+        # computes the forces for all the particles in the cell
         for i in particles:
             xi = i.position_x
             yi = i.position_y
             ti = i.particle_type
+            
+            # row in the matrix for the particle i type (faster optimisation)
             row = interaction_matrix[ti]
 
             force_x = 0.0
             force_y = 0.0
 
+            # cell coordinates for particle i
             cxi = int(xi * inv_cell)
             cyi = int(yi * inv_cell)
 
@@ -119,28 +119,36 @@ class ParticleSystem:
                     cell = grid.get((cxi + dx_cells, cyi + dy_cells))
                     if not cell:
                         continue
-
+                    
+                    # iterate particles in the neighbor cells
                     for j in cell:
                         if j is i:
-                            continue
+                            continue # skips self
+                        
+                        #takes the interaction coefficient from the matrix
                         k = row[j.particle_type]
                         if k == 0.0:
-                            continue
+                            continue # skips if no interaction
 
                         dx = j.position_x - xi
                         dy = j.position_y - yi
                         d_squared = dx * dx + dy * dy
 
+                        # ignores extremly small distances (avoid division by zero)
+                        # also ignores particle outside the cutoff radius
                         if d_squared < 1e-6 or d_squared > radius_squared:
                             continue
-
+                        
+                        # computes the distance and normalized direction
                         inv_d = 1.0 / sqrt(d_squared)
                         dist = d_squared * inv_d
-
+                        
                         strength = k * (1.0 - dist * inv_r)
 
+                        # calculate the forces(direction * strenght)
                         force_x += dx * inv_d * strength
                         force_y += dy * inv_d * strength
+
             i.apply_force(force_x, force_y)
 
     

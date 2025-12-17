@@ -148,7 +148,7 @@ class Visualizer:
 
         pygame.init()
         pygame.display.set_caption("Particle Life")
-        self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
+        self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE) # added resizable feature
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("Arial", 18)
         self.small_font = pygame.font.SysFont("Arial", 14)
@@ -292,14 +292,17 @@ class Visualizer:
                     self.simulation_running = not self.simulation_running
             
             elif event.type == pygame.VIDEORESIZE:
-                w, h = event.size
+                w, h = event.size # new window size after the resize event
                 # updates visualizer size
                 self.width, self.height = w, h
                 # updates particle system bounds
                 self.system.width = w
                 self.system.height = h
+                # recreates the main display surface with the new size
                 self.screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
+                # recreates the trail surface
                 self.trail_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+                # recreates fade surface used to fade old frames
                 self.fade_surface = pygame.Surface((w, h), pygame.SRCALPHA)
                 self.fade_surface.fill((0, 0, 0, 20))
 
@@ -425,7 +428,7 @@ class Visualizer:
                 continue
 
             color = self.type_colors[p.particle_type]
-            r = int(self.particle_radius)
+            r = int(self.particle_radius) # сache integer radius to avoid repeated type conversion in draw calls
             pygame.draw.circle(self.trail_surface, color, (x, y), r)
 
         # blit the trails onto the main screen
