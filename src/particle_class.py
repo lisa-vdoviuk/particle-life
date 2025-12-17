@@ -25,8 +25,9 @@ class Particle:
         self.velocity_y *= (1.0 - friction)
         
         # Edding randomness
-        self.velocity_x += random.uniform(-random_motion, random_motion)
-        self.velocity_y += random.uniform(-random_motion, random_motion)
+        uniform = random.uniform
+        self.velocity_x += uniform(-random_motion, random_motion)
+        self.velocity_y += uniform(-random_motion, random_motion)
         
         # Limit or maximum speed
         speed_squared = self.velocity_x**2 + self.velocity_y**2
