@@ -143,7 +143,7 @@ def create_or_load_config() -> SimulationConfig:
 
 def main() -> None:
     
-    width, height = 1920, 1080
+    width, height = 800, 600
 
     config = create_or_load_config()
 
@@ -157,7 +157,7 @@ def main() -> None:
     types = list(range(config.num_types))
 
     
-    system.add_particles(count=300, types=types)
+    system.add_particles(count=1000, types=types)
 
     visualizer = Visualizer(
         system,

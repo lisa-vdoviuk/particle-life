@@ -10,6 +10,8 @@ class ParticleSystem:
         self.config = config
         self.width = width
         self.height = height
+        self._force_frame = 0
+        self._grid = {}
     
     def add_particles(self, count: int, types: List[int]):
         """Adds particles with positions and types"""
@@ -36,62 +38,116 @@ class ParticleSystem:
     
     def update_system(self, dt: float):
         """Updated the whole system"""
-        self.calculate_forces()
+        self._force_frame += 1
+        r = self.config.interaction_radius
+        every = 3 if r <= 50 else (5 if r <= 100 else 6)
+        if self._force_frame % every == 0:
+            self.calculate_forces()
+        friction = self.config.friction
+        max_v = self.config.max_velocity
+        rnd_m = self.config.random_motion
+        w = self.width
+        h = self.height
+        change = 4
+        rnd_change = rnd_m if (self._force_frame % change == 0) else 0.0
         for particle in self.particles:
             particle.update_position(
                 dt,
-                self.config.friction,
-                self.config.max_velocity,
-                self.config.random_motion
+                friction,
+                max_v,
+                rnd_change
             )
-
+            
             # keep particles inside the simulation area (wrap-around)
             particle.position_x %= self.width
             particle.position_y %= self.height
 
     
     def calculate_forces(self):
-        """Calculates the forces between all the particles (optimized)."""
+        """Calculates the forces between all the particles using a uniform grid (spatial hashing)."""
         particles = self.particles
-        get_interaction = self.config.get_interaction
-        interaction_radius = self.config.interaction_radius
-        radius_squared = interaction_radius * interaction_radius
+        config = self.config
+        # locals for the faster optimisation
+        sqrt = math.sqrt
+        interaction_matrix = config.interaction_matrix.matrix
+        
+        #interaction radius (distance)
+        r = float(config.interaction_radius)
+        if r <= 0.0:
+            return
+        
+        radius_squared = r * r # compare squared distances to avoid sqrt when possible
+        inv_r = 1.0 / r # precompute the inverse of interaction radius for the optimisation
 
+        #we use cell size as r so we only check the currenct cell all the neighbor cells
+        cell_size = r
+        inv_cell = 1.0 / cell_size # precompute the inverse cell for the optimisation
+        cell_range = 1 # checks 1 cell away, -> 3x3 blocks(currecnt cell + 8 neighbor cells)
+
+        # creates the dict with all the particales cells location
+        grid = self._grid
+        grid.clear()
+        # grid keeps particles
+        for p in particles:
+            cx = int(p.position_x * inv_cell)
+            cy = int(p.position_y * inv_cell)
+            key = (cx, cy)
+            if key not in grid:
+                grid[key] = []
+            grid[key].append(p)
+        
+        # computes the forces for all the particles in the cell
         for i in particles:
-           
             xi = i.position_x
             yi = i.position_y
             ti = i.particle_type
+            
+            # row in the matrix for the particle i type (faster optimisation)
+            row = interaction_matrix[ti]
 
             force_x = 0.0
             force_y = 0.0
 
-            for j in particles:
-                if j is i:
-                    continue
+            # cell coordinates for particle i
+            cxi = int(xi * inv_cell)
+            cyi = int(yi * inv_cell)
 
-                k = get_interaction(ti, j.particle_type)
-                if abs(k) < 0.001:
-                    continue
 
-                dx = j.position_x - xi
-                dy = j.position_y - yi
-                dist_squared = dx * dx + dy * dy
+            # checks current cells and the 8 neighboring cells
+            for dx_cells in range(-cell_range, cell_range + 1):
+                for dy_cells in range(-cell_range, cell_range + 1):
+                    cell = grid.get((cxi + dx_cells, cyi + dy_cells))
+                    if not cell:
+                        continue
+                    
+                    # iterate particles in the neighbor cells
+                    for j in cell:
+                        if j is i:
+                            continue # skips self
+                        
+                        #takes the interaction coefficient from the matrix
+                        k = row[j.particle_type]
+                        if k == 0.0:
+                            continue # skips if no interaction
 
-                
-                if dist_squared < 1e-6 or dist_squared > radius_squared:
-                    continue
+                        dx = j.position_x - xi
+                        dy = j.position_y - yi
+                        d_squared = dx * dx + dy * dy
 
-                dist = math.sqrt(dist_squared)
+                        # ignores extremly small distances (avoid division by zero)
+                        # also ignores particle outside the cutoff radius
+                        if d_squared < 1e-6 or d_squared > radius_squared:
+                            continue
+                        
+                        # computes the distance and normalized direction
+                        inv_d = 1.0 / sqrt(d_squared)
+                        dist = d_squared * inv_d
+                        
+                        strength = k * (1.0 - dist * inv_r)
 
-                dir_x = dx / dist
-                dir_y = dy / dist
-
-                linear_decay = 1.0 - (dist / interaction_radius)
-                strength = k * linear_decay
-
-                force_x += dir_x * strength
-                force_y += dir_y * strength
+                        # calculate the forces(direction * strenght)
+                        force_x += dx * inv_d * strength
+                        force_y += dy * inv_d * strength
 
             i.apply_force(force_x, force_y)
 
