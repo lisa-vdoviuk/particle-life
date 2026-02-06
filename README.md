@@ -1,42 +1,167 @@
-# **Particle Life Simulator**
+# Particle Life Simulation
 
-**About the Project**
+A real-time particle simulation demonstrating emergent behavior based on simple interaction rules between particle types.  
+Developed for the course **Data Science & AI Infrastructures (WS 2025/2026)**.
 
-This project implements a dynamic particle system where thousands of particles interact based on predefined rules, creating complex emergent patterns and visual complexity. Inspired by biological systems, the simulation showcases how simple interaction rules can lead to fascinating collective behaviors.
+## Overview
 
------------------------------------------------------------------------
+This project implements a dynamic particle system in Python where multiple particle types interact via attraction and repulsion forces defined in an interaction matrix.  
+From simple local rules, complex global movement patterns emerge in real time.
 
-**Learning Objectives**
+The project focuses on clean architecture, configurability, and performance-aware simulation design.
 
-- 🏗️ Implementation of complex programming projects in teams
+---
 
-- 🐍 Python software development following modern standards and best practices
+## Installation
 
-- 🧠 Insight into biologically inspired algorithms
+Clone the repository and install dependencies:
 
-- ⚡ Experience with Python runtime optimization
+```bash
+git clone https://github.com/lisa-vdoviuk/particle-life.git
+cd particle-life
+pip install -r requirements.txt
+````
 
--------------------------------------------------------------------------
+---
 
-**Features**
+## Running the Simulation
 
-- Core Simulation
-  
-- Dynamic Particle System with interacting particles
+Start the application:
 
-- Multiple Particle Types (minimum 4) with unique colors and behaviors
+```bash
+python main.py
+```
 
-- Interaction Matrix defining attraction/repulsion between different particle types
+At launch you can:
 
-- Real-time Visualization
+* Load an existing JSON preset, or
+* Enter a custom interaction matrix via console.
 
-- Configurable Parameters: interaction strength, influence range, friction, random motion (optional)
+After configuration, the visualization window opens automatically.
 
+---
 
------------------------------------------------------------------------
+## Features
 
-**Diagram**
+* Multiple particle types with different behaviors
+* Attraction/repulsion defined by an interaction matrix
+* Real-time visualization using Pygame
+* Adjustable simulation parameters (radius, chaos, size)
+* Save/load configuration presets
 
-<img width="1640" height="2618" alt="output-onlinepngtools" src="https://github.com/user-attachments/assets/1ef721c4-9ef0-49b4-824f-39fe6f88e93c" />
+---
 
+## Project Structure
 
+```
+main.py                 # Entry point and setup
+particle_class.py       # Particle data model and movement logic
+particle_system.py      # Core simulation and force calculations
+interaction_matrix.py   # Interaction rules between particle types
+simulation_config.py    # Central configuration + JSON presets
+visualizer.py           # Rendering and interactive UI
+requirements.txt        # Dependencies
+```
+
+---
+
+## Software Architecture (Developer Documentation)
+
+The system is modular and split into clearly defined responsibilities:
+
+**Particle**
+
+* Stores position, velocity, type, and color
+* Updates movement and applies forces
+
+**ParticleSystem**
+
+* Manages all particles
+* Calculates forces between nearby particles
+* Updates positions each frame
+* Uses a grid-based approach to reduce computation cost
+
+**InteractionMatrix**
+
+* Defines attraction/repulsion values between particle types
+* Can be randomized or configured manually
+
+**SimulationConfig**
+
+* Central storage for all parameters:
+
+  * friction
+  * max velocity
+  * interaction radius
+  * random motion
+* Supports saving/loading presets as JSON
+
+**Visualizer**
+
+* Handles real-time rendering using Pygame
+* Provides UI controls and sliders
+* Allows particle inspection and system reset
+
+---
+
+## Simulation Logic
+
+Each frame:
+
+1. Forces between particles are computed based on:
+
+   * Distance
+   * Particle types
+   * Interaction matrix
+
+2. Forces update particle velocities
+
+3. Positions are updated with:
+
+   * Friction
+   * Random motion
+   * Velocity limits
+
+4. Particles are rendered in real time
+
+This results in emergent clustering and dynamic patterns.
+
+---
+
+## Developer Guide
+
+To work on the project:
+
+1. Create a new branch for your feature or fix
+2. Keep code modular and readable
+3. Add docstrings to new classes/functions
+4. Test changes by running the simulation
+
+Main extension points:
+
+...
+
+The configuration system allows easy experimentation by saving/loading presets.
+
+---
+
+## Controls
+
+* **Space** → Pause / Resume simulation
+* **Mouse click** → Select particle
+* **UI panel** → Adjust parameters, reset or randomize system
+
+---
+
+## Team
+
+* Yelyzaveta Vdoviuk
+* Oleksii Zvirkovskyi
+* Thorben Linzmaier
+* Emen Fouda
+
+---
+
+## License
+
+For academic use only.
