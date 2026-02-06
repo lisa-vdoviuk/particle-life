@@ -4,6 +4,121 @@ from typing import List, Dict
 import random
 import math
 
+# -------------------- NUMBA ADD-ON (optional acceleration) --------------------
+# Numba accelerates the hot loop (neighbor search + pairwise forces)
+try:
+    import numpy as np
+    from numba import njit
+    NUMBA_OK = True
+except Exception:
+    NUMBA_OK = False
+
+if NUMBA_OK:
+    @njit(fastmath=True, cache=True)
+    def _compute_forces_numba(xs, ys, types, matrix, r, cell_size, width, height, cell_range):
+        # uniform grid (spatial hashing) with a linked-list per cell:
+        n = xs.shape[0]
+        beta = 0.35 # repulsion core size (larger -> fewer "solid" clumps)
+        force_scale = 0.04 # global force multiplier (like "alpha" in demos(project links with examples))
+        fx = np.zeros(n, dtype=np.float32)
+        fy = np.zeros(n, dtype=np.float32)
+
+        if n == 0:
+            return fx, fy
+
+        inv_cell = 1.0 / cell_size
+        radius2 = r * r
+
+        nx = int(width * inv_cell) + 1
+        ny = int(height * inv_cell) + 1
+        ncell = nx * ny
+
+        # head[cell] = first particle index in that cell, nxt[i] = next particle index in same cell.
+        head = np.full(ncell, -1, dtype=np.int32)
+        nxt = np.empty(n, dtype=np.int32)
+
+        half_w = 0.5 * width
+        half_h = 0.5 * height
+
+        # build linked list per cell
+        for i in range(n):
+            cx = int(xs[i] * inv_cell)
+            cy = int(ys[i] * inv_cell)
+
+            # wrap
+            cx %= nx
+            cy %= ny
+
+            c = cx + cy * nx
+            nxt[i] = head[c]
+            head[c] = i
+
+        # compute forces
+        for i in range(n):
+            xi = xs[i]
+            yi = ys[i]
+            ti = types[i]
+
+            cxi = int(xi * inv_cell)
+            cyi = int(yi * inv_cell)
+
+            # wrap neighbor cell coordinates (gx, gy) to stay inside grid
+            # iterate over neighboring cells (Moore neighborhood)
+            # cell_range is chosen so that all particles within radius r are covered
+            for dx_cell in range(-cell_range, cell_range + 1):
+                gx = cxi + dx_cell
+                if gx < 0:
+                    gx += nx 
+                elif gx >= nx:
+                    gx -= nx
+
+                for dy_cell in range(-cell_range, cell_range + 1):
+                    gy = cyi + dy_cell
+                    if gy < 0:
+                        gy += ny 
+                    elif gy >= ny:
+                        gy -= ny
+
+
+                    cell = gx + gy * nx
+                    j = head[cell]
+                    while j != -1:
+                        if j != i:
+                            tj = types[j]
+                            k = matrix[ti, tj]
+                            if k != 0.0:
+                                # wrap dx/dy using half width/height so particles interact across borders correctly
+                                dx = xs[j] - xi
+                                dy = ys[j] - yi
+                                if dx > half_w:
+                                    dx -= width
+                                elif dx < -half_w:
+                                    dx += width
+
+                                if dy > half_h:
+                                    dy -= height
+                                elif dy < -half_h:
+                                    dy += height
+                                d2 = dx * dx + dy * dy
+
+                                if d2 > 1e-6 and d2 <= radius2:
+                                    inv_d = 1.0 / math.sqrt(d2)
+                                    dist = d2 * inv_d  # sqrt(d2)
+                                    q = dist / r # normalized distance
+                                    if q < beta: # linear repulsion (prevents collapse)
+                                        f = (q / beta) - 1.0
+                                    else:
+                                        f = (1.0 - q) / (1.0 - beta) # linear attraction/repulsion fading to zero at r
+                                    strength = k * f * force_scale
+                                    fx[i] += dx * inv_d * strength
+                                    fy[i] += dy * inv_d * strength
+
+                        j = nxt[j]
+
+        return fx, fy
+# ---------------------------------------------------------------------
+
+
 class ParticleSystem:
     def __init__(self, particles: List[Particle], config: SimulationConfig, width: int, height: int):
         self.particles = particles
@@ -12,20 +127,24 @@ class ParticleSystem:
         self.height = height
         self._force_frame = 0
         self._grid = {}
-    
+
+        # numpy-matrix cache
+        self._numba_matrix_np = None
+        self._numba_matrix_shape = None
+
     def add_particles(self, count: int, types: List[int]):
         """Adds particles with positions and types"""
         for _ in range(count):
             particle_type = random.choice(types)
             x = random.uniform(0, self.width)
             y = random.uniform(0, self.height)
-            
+
             # Minimum starting velocity
             vx = random.uniform(-0.5, 0.5)
             vy = random.uniform(-0.5, 0.5)
-            
+
             color = self.config.particle_colors[particle_type]
-            
+
             p = Particle(
                 particle_type=particle_type,
                 position_x=x,
@@ -35,21 +154,17 @@ class ParticleSystem:
                 color=color
             )
             self.particles.append(p)
-    
+
     def update_system(self, dt: float):
         """Updated the whole system"""
         self._force_frame += 1
-        r = self.config.interaction_radius
-        every = 3 if r <= 50 else (5 if r <= 100 else 6)
-        if self._force_frame % every == 0:
-            self.calculate_forces()
+        self.calculate_forces(dt)
+
         friction = self.config.friction
         max_v = self.config.max_velocity
         rnd_m = self.config.random_motion
-        w = self.width
-        h = self.height
-        change = 4
-        rnd_change = rnd_m if (self._force_frame % change == 0) else 0.0
+        rnd_change = rnd_m
+
         for particle in self.particles:
             particle.update_position(
                 dt,
@@ -57,36 +172,49 @@ class ParticleSystem:
                 max_v,
                 rnd_change
             )
-            
+
             # keep particles inside the simulation area (wrap-around)
             particle.position_x %= self.width
             particle.position_y %= self.height
 
-    
-    def calculate_forces(self):
-        """Calculates the forces between all the particles using a uniform grid (spatial hashing)."""
+    # -------------------- PYTHON --------------------
+    def _calculate_forces_python(self):
+        """
+        Reference (pure Python) implementation of particle interactions.
+
+        - Simple and readable
+        - Uses uniform grid (spatial hashing)
+        - NOT optimized for performance
+        - Intended only as fallback or for debugging / reference
+        """
+
         particles = self.particles
         config = self.config
+
+        if not particles:
+            return
+
         # locals for the faster optimisation
         sqrt = math.sqrt
         interaction_matrix = config.interaction_matrix.matrix
-        
-        #interaction radius (distance)
+
+        # interaction radius (distance)
         r = float(config.interaction_radius)
         if r <= 0.0:
             return
-        
-        radius_squared = r * r # compare squared distances to avoid sqrt when possible
-        inv_r = 1.0 / r # precompute the inverse of interaction radius for the optimisation
 
-        #we use cell size as r so we only check the currenct cell all the neighbor cells
+        radius_squared = r * r  # compare squared distances to avoid sqrt when possible
+        inv_r = 1.0 / r         # precompute the inverse of interaction radius for the optimisation
+
+        # we use cell size as r so we only check the current cell and the neighbor cells
         cell_size = r
-        inv_cell = 1.0 / cell_size # precompute the inverse cell for the optimisation
-        cell_range = 1 # checks 1 cell away, -> 3x3 blocks(currecnt cell + 8 neighbor cells)
+        inv_cell = 1.0 / cell_size  # precompute the inverse cell for the optimisation
+        cell_range = 1              # checks 1 cell away -> 3x3 blocks (current cell + 8 neighbors)
 
-        # creates the dict with all the particales cells location
+        # creates the dict with all the particles cell locations
         grid = self._grid
         grid.clear()
+
         # grid keeps particles
         for p in particles:
             cx = int(p.position_x * inv_cell)
@@ -95,13 +223,13 @@ class ParticleSystem:
             if key not in grid:
                 grid[key] = []
             grid[key].append(p)
-        
+
         # computes the forces for all the particles in the cell
         for i in particles:
             xi = i.position_x
             yi = i.position_y
             ti = i.particle_type
-            
+
             # row in the matrix for the particle i type (faster optimisation)
             row = interaction_matrix[ti]
 
@@ -112,46 +240,94 @@ class ParticleSystem:
             cxi = int(xi * inv_cell)
             cyi = int(yi * inv_cell)
 
-
             # checks current cells and the 8 neighboring cells
             for dx_cells in range(-cell_range, cell_range + 1):
                 for dy_cells in range(-cell_range, cell_range + 1):
                     cell = grid.get((cxi + dx_cells, cyi + dy_cells))
                     if not cell:
                         continue
-                    
+
                     # iterate particles in the neighbor cells
                     for j in cell:
                         if j is i:
-                            continue # skips self
-                        
-                        #takes the interaction coefficient from the matrix
+                            continue  # skips self
+
+                        # takes the interaction coefficient from the matrix
                         k = row[j.particle_type]
                         if k == 0.0:
-                            continue # skips if no interaction
+                            continue  # skips if no interaction
 
                         dx = j.position_x - xi
                         dy = j.position_y - yi
                         d_squared = dx * dx + dy * dy
 
-                        # ignores extremly small distances (avoid division by zero)
-                        # also ignores particle outside the cutoff radius
+                        # ignores extremely small distances (avoid division by zero)
+                        # also ignores particles outside the cutoff radius
                         if d_squared < 1e-6 or d_squared > radius_squared:
                             continue
-                        
+
                         # computes the distance and normalized direction
                         inv_d = 1.0 / sqrt(d_squared)
                         dist = d_squared * inv_d
-                        
+
                         strength = k * (1.0 - dist * inv_r)
 
-                        # calculate the forces(direction * strenght)
+                        # calculate the forces (direction * strength)
                         force_x += dx * inv_d * strength
                         force_y += dy * inv_d * strength
 
             i.apply_force(force_x, force_y)
+    # -------------------------------------------------------------------------------
 
-    
+    def calculate_forces(self, dt):
+        """Calculates the forces between all the particles. Uses Numba if available."""
+        particles = self.particles
+        n = len(particles)
+        if n == 0:
+            return
+
+        r = float(self.config.interaction_radius)
+        if r <= 0.0:
+            return
+
+        # if numba not available
+        if not NUMBA_OK:
+            raise RuntimeError("Numba is required for this simulation")
+
+        # Grid parameters (tunable)
+        cell_size = r * 0.6
+        cell_range = int(math.ceil(r / cell_size))
+
+        # prepare arrays
+        xs = np.empty(n, dtype=np.float32)
+        ys = np.empty(n, dtype=np.float32)
+        types = np.empty(n, dtype=np.int32)
+
+        for i, p in enumerate(particles):
+            xs[i] = p.position_x
+            ys[i] = p.position_y
+            types[i] = p.particle_type
+
+        # cache matrix as numpy float32
+        mat_list = self.config.interaction_matrix.matrix
+        shape = (len(mat_list), len(mat_list[0])) if len(mat_list) else (0, 0)
+
+        if self._numba_matrix_np is None or self._numba_matrix_shape != shape:
+            self._numba_matrix_np = np.asarray(mat_list, dtype=np.float32)
+            self._numba_matrix_shape = shape
+
+        fx, fy = _compute_forces_numba(
+            xs, ys, types, self._numba_matrix_np,
+            float(r), float(cell_size),
+            int(self.width), int(self.height),
+            int(cell_range)
+        )
+
+        # apply forces back
+        for i, p in enumerate(particles):
+            p.velocity_x += float(fx[i]) * dt
+            p.velocity_y += float(fy[i]) * dt
+
     def get_particles_data(self) -> List[Dict]:
         """Return the data for visualization"""
         result = []
@@ -163,11 +339,10 @@ class ParticleSystem:
                 "vy": p.velocity_y,
                 "type": p.particle_type,
                 "color": p.color
-                
             }
             result.append(particle_data)
         return result
-    
+
     def reset_system(self):
         """Resets the system"""
         self.particles.clear()
