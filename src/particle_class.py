@@ -20,13 +20,25 @@ class Particle:
     
     def update_position(self, dt: float, friction: float, max_velocity: float, random_motion: float):
         """Updates the position"""
-        # Applying friction
-        self.velocity_x *= (1.0 - friction)
-        self.velocity_y *= (1.0 - friction)
+        if dt <= 0.0:
+            return
+
+        # clamp friction to [0, 1)
+        if friction < 0.0:
+            friction = 0.0
+        elif friction >= 1.0:
+            friction = 0.999999
+
+        # Applying friction (*Per second*)
+        damp = (1.0 - friction) ** dt
+        self.velocity_x *= damp
+        self.velocity_y *= damp
         
-        # Edding randomness
-        self.velocity_x += random.uniform(-random_motion, random_motion)
-        self.velocity_y += random.uniform(-random_motion, random_motion)
+        # Scale random motion by sqrt(dt) for frame-rate independence
+        rm = random_motion * (dt ** 0.5)
+        uniform = random.uniform
+        self.velocity_x += uniform(-rm, rm)
+        self.velocity_y += uniform(-rm, rm)
         
         # Limit or maximum speed
         speed_squared = self.velocity_x**2 + self.velocity_y**2

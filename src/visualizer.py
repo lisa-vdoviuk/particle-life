@@ -1,4 +1,5 @@
 import pygame
+import time
 from particle_system import ParticleSystem
 from simulation_config import SimulationConfig
 
@@ -156,7 +157,7 @@ class Visualizer:
 
         pygame.init()
         pygame.display.set_caption("Particle Life")
-        self.screen = pygame.display.set_mode((self.width, self.height))
+        self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE) # added resizable feature
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("Arial", 18)
         self.small_font = pygame.font.SysFont("Arial", 14)
@@ -169,6 +170,10 @@ class Visualizer:
                 self.type_colors.append(pygame.Color(c))
             except ValueError:
                 self.type_colors.append(pygame.Color(255, 255, 255))
+
+        self._circle_cache: dict[tuple[int, int], pygame.Surface] = {}
+        self._frame = 0
+        self.fade_every_n_frames = 3
 
         # surfaces used for trails effect
         self.trail_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -277,6 +282,10 @@ class Visualizer:
     # main loop
     # ==================================================================
     def run(self) -> None:
+        time_physics = 0
+        time_draw = 0
+        frame_count = 0
+
         while self.running:
             dt_ms = self.clock.tick(self.target_fps)
             dt = dt_ms / 1000.0
@@ -287,9 +296,27 @@ class Visualizer:
                 # clamp very large time steps (e.g. when window is dragged)
                 if dt > 0.05:
                     dt = 0.05
+                t0 = time.perf_counter()
                 self.system.update_system(dt * self.speed_factor)
+                time_physics += time.perf_counter() - t0
 
+            t0 = time.perf_counter()
             self._draw()
+            time_draw += time.perf_counter() - t0
+
+            frame_count += 1
+
+            if frame_count % 120 == 0:
+                avg_physics = (time_physics / frame_count) * 1000
+                avg_draw = (time_draw / frame_count) * 1000
+                total = avg_physics + avg_draw
+                print(f"Physics: {avg_physics:.2f}ms | Draw: {avg_draw:.2f}ms | Total: {total:.2f}ms | Target: 16.67ms")
+
+                time_physics = 0
+                time_draw = 0
+                frame_count = 0
+
+            #self._draw()
 
         pygame.quit()
 
@@ -307,6 +334,21 @@ class Visualizer:
                 elif event.key == pygame.K_SPACE:
                     # quick pause / unpause
                     self.simulation_running = not self.simulation_running
+            
+            elif event.type == pygame.VIDEORESIZE:
+                w, h = event.size # new window size after the resize event
+                # updates visualizer size
+                self.width, self.height = w, h
+                # updates particle system bounds
+                self.system.width = w
+                self.system.height = h
+                # recreates the main display surface with the new size
+                self.screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
+                # recreates the trail surface
+                self.trail_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+                # recreates fade surface used to fade old frames
+                self.fade_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+                self.fade_surface.fill((0, 0, 0, 20))
 
             if event.type in (
                 pygame.MOUSEBUTTONDOWN,
@@ -433,14 +475,17 @@ class Visualizer:
         # particles with nice trailing effect
         self._draw_particles_with_trails()
 
+
         # UI overlay
         self._draw_ui_panel()
 
         pygame.display.flip()
 
     def _draw_particles_with_trails(self) -> None:
+        self._frame += 1
         # slightly darken previous trails
-        self.trail_surface.blit(self.fade_surface, (0, 0))
+        if self._frame % self.fade_every_n_frames == 0:
+            self.trail_surface.blit(self.fade_surface, (0, 0))
 
         # draw new particle positions onto the trail surface
         for p in self.system.particles:
@@ -450,12 +495,8 @@ class Visualizer:
                 continue
 
             color = self.type_colors[p.particle_type]
-            pygame.draw.circle(
-                self.trail_surface,
-                color,
-                (x, y),
-                int(self.particle_radius),
-            )
+            r = int(self.particle_radius) # сache integer radius to avoid repeated type conversion in draw calls
+            pygame.draw.circle(self.trail_surface, color, (x, y), r)
 
         # blit the trails onto the main screen
         self.screen.blit(self.trail_surface, (0, 0))
@@ -472,8 +513,24 @@ class Visualizer:
                 int(self.particle_radius) + 3,
                 width=1,
             )
+    
+    def _get_circle_sprite(self, color: pygame.Color, radius: int) -> pygame.Surface:
+        """Return cached circle surface for (color, radius)."""
+        key = (color.r << 16) | (color.g << 8) | color.b, radius
+        surf = self._circle_cache.get(key)
+        if surf is not None:
+            return surf
+
+        size = radius * 2 + 2
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        pygame.draw.circle(surf, color, (size // 2, size // 2), radius)
+        self._circle_cache[key] = surf
+        return surf
 
     def _draw_ui_panel(self) -> None:
+        w, h = self.screen.get_size()
+        self.panel_rect.x = w - self.panel_width - self.panel_margin
+        self.panel_rect.y = self.panel_margin
         """
         Draw semi-transparent control panel on the top-right.
         Panel height is dynamic so performance text always fits.
