@@ -1,0 +1,39 @@
+{
+  "num_types": 4,
+  "friction": 0.02,
+  "max_velocity": 6.0,
+  "interaction_radius": 50.0,
+  "random_motion": 0.05,
+  "particle_colors": [
+    "red",
+    "green",
+    "yellow",
+    "blue"
+  ],
+  "interaction_matrix": [
+    [
+      0.0,
+      0.5,
+      0.5,
+      0.4
+    ],
+    [
+      0.3,
+      -0.2,
+      -0.2,
+      0.8
+    ],
+    [
+      0.6,
+      0.4,
+      0.3,
+      0.2
+    ],
+    [
+      0.2,
+      0.5,
+      0.3,
+      0.4
+    ]
+  ]
+}

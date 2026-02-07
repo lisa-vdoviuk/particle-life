@@ -122,6 +122,7 @@ class Visualizer:
         # overall state flags
         self.running = True
         self.simulation_running = True
+        self.heatmap_open = False
 
         # right-side panel base geometry
         self.panel_width = 320
@@ -144,6 +145,14 @@ class Visualizer:
 
         # particle visual radius (controlled by "Size" slider)
         self.particle_radius = 3.0
+        # variables for the heatmap
+        self.selected_cell = (0,0)
+        self.matrix_origin = (40,75)
+        self.matrix_cell_size = 60
+        self.matrix_gap = 1
+        self.grid_size = 4
+        self.matrix_cell_rects = {}
+        
 
         pygame.init()
         pygame.display.set_caption("Particle Life")
@@ -185,9 +194,18 @@ class Visualizer:
         self.randomize_button_rect = pygame.Rect(
             btn_x, top_y + 2 * (btn_height + 10), btn_width, btn_height
         )
+        self.edit_button_rect = pygame.Rect(
+            btn_x, top_y + 3 * (btn_height + 10), btn_width, btn_height
+
+        )
+        self.back_button_rect = pygame.Rect(
+            btn_x, top_y + 7.5 * (btn_height + 10), btn_width, btn_height
+
+        )
+
 
         # sliders (panel-local coordinates)
-        slider_start_y = top_y + 3 * (btn_height + 18)
+        slider_start_y = top_y + 3 * (btn_height + 28)
         slider_height = 16
         slider_spacing = 46
         slider_rects: list[pygame.Rect] = []
@@ -224,11 +242,37 @@ class Visualizer:
                 0.0,
                 0.2,
                 config.random_motion,
-            ),
+            )   
             # If you want Friction slider back, add one more rect and here:
             # Slider("Friction", "friction", slider_rects[3], 0.0, 0.2, config.friction),
         ]
-
+        
+        # calculates the overall height of the heatmap
+        grid_height = self.grid_size * self.matrix_cell_size + (self.grid_size -1) *self.matrix_gap
+        heat_slider_start_y = self.matrix_origin[1] + grid_height + 20
+        #creates the slider for the heatmap
+        heat_slider_rect = pygame.Rect(
+            16,
+            heat_slider_start_y,
+            btn_width,
+            slider_height,
+        )
+        self.heat_slider = Slider(
+            "Interaction",
+            "",
+            heat_slider_rect,
+            -1.0,
+            1.0,
+            config.get_interaction(0,0)
+        )
+        #Drawing the rects for the Heatmap
+        for i in range(self.grid_size):
+            for j in range(self.grid_size):
+                x = self.matrix_origin[0] + j * (self.matrix_cell_size + self.matrix_gap)
+                y = self.matrix_origin[1] + i * (self.matrix_cell_size + self.matrix_gap)
+                matrix_rect =pygame.Rect(x , y, self.matrix_cell_size, self.matrix_cell_size)
+                # saves cell(index) + rect in a dictionary -> you can refer to the rect of every cell
+                self.matrix_cell_rects[(i, j)] = matrix_rect
     # ==================================================================
     # main loop
     # ==================================================================
@@ -277,17 +321,25 @@ class Visualizer:
 
         # first, sliders (only when panel is visible)
         if not self.panel_collapsed:
-            for slider in self.sliders:
-                slider.handle_event(event, panel_offset)
+            if not self.heatmap_open:
+                for slider in self.sliders:
+                    slider.handle_event(event, panel_offset)
 
-            # apply slider values to config or visuals
-            config = self.system.config
-            for slider in self.sliders:
-                if slider.param_name:
-                    config.update_parameter(slider.param_name, slider.value)
-                else:
-                    # visual-only parameter: particle size
-                    self.particle_radius = slider.value
+                # apply slider values to config or visuals
+                config = self.system.config
+                for slider in self.sliders:
+                    if slider.param_name:
+                        config.update_parameter(slider.param_name, slider.value)
+                    else:
+                        # visual-only parameter: particle size
+                        self.particle_radius = slider.value
+            # adds slider and applys slider value to config
+            if self.heatmap_open:
+                self.heat_slider.handle_event(event, panel_offset)
+                if self.heat_slider.dragging:
+                    config = self.system.config
+                    (i, j) = self.selected_cell
+                    config.set_interaction(i, j, self.heat_slider.value)
 
         # handle simple mouse clicks
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -308,15 +360,30 @@ class Visualizer:
         # if click is inside panel area, check buttons
         if 0 <= local_x < self.panel_width and 0 <= local_y < self.panel_rect.height:
             if not self.panel_collapsed:
-                if self.play_button_rect.collidepoint(local_x, local_y):
-                    self.simulation_running = not self.simulation_running
+                if not self.heatmap_open:
+                    if self.play_button_rect.collidepoint(local_x, local_y):
+                        self.simulation_running = not self.simulation_running
+                        return
+                    if self.reset_button_rect.collidepoint(local_x, local_y):
+                        self._reset_particles()
+                        return
+                    if self.randomize_button_rect.collidepoint(local_x, local_y):
+                        self._randomize_system()
+                        return
+                    if self.edit_button_rect.collidepoint(local_x, local_y):
+                        self.heatmap_open = not self.heatmap_open
+                        return
+                else:
+                    if self.back_button_rect.collidepoint(local_x,local_y):
+                        self.heatmap_open = not self.heatmap_open
+                    
+                    # iterates over cells, checks if they're clicked and saves it in selected_cell
+                    for ((i,j), matrix_rect) in self.matrix_cell_rects.items():
+                        if matrix_rect.collidepoint(local_x,local_y):
+                            self.selected_cell = (i,j)
                     return
-                if self.reset_button_rect.collidepoint(local_x, local_y):
-                    self._reset_particles()
-                    return
-                if self.randomize_button_rect.collidepoint(local_x, local_y):
-                    self._randomize_system()
-                    return
+                    
+
             # click was on the panel, do not select a particle
             return
 
@@ -414,7 +481,7 @@ class Visualizer:
         # when collapsed, only header row is visible
         if self.panel_collapsed:
             panel_height = 44
-        else:
+        else: 
             # estimate how many lines of info we will draw
             base_info_lines = 2  # FPS + Particles
             extra_lines = 0
@@ -431,7 +498,7 @@ class Visualizer:
             panel_height = max(
                 self.panel_min_height,
                 info_start_y + info_block_height + 16,
-            )
+            )             
 
         # update panel rect height for correct mouse interaction
         self.panel_rect.height = panel_height
@@ -463,18 +530,46 @@ class Visualizer:
         panel_surface.blit(title_surf, title_rect.topleft)
 
         if not self.panel_collapsed:
-            # buttons
-            self._draw_buttons(panel_surface)
+            if not self.heatmap_open:
+                # buttons
+                self._draw_buttons(panel_surface)
 
-            # sliders
-            for slider in self.sliders:
-                slider.draw(panel_surface, self.small_font)
+                # sliders
+                for slider in self.sliders:
+                    slider.draw(panel_surface, self.small_font)
 
-            # info block (FPS + selected particle) directly under sliders
-            last_slider_bottom = max(s.rect.bottom for s in self.sliders)
-            info_start_y = last_slider_bottom + 24
-            self._draw_info_block(panel_surface, info_start_y)
+                # info block (FPS + selected particle) directly under sliders
+                last_slider_bottom = max(s.rect.bottom for s in self.sliders)
+                info_start_y = last_slider_bottom + 24
+                self._draw_info_block(panel_surface, info_start_y)
 
+                # heatmap part of the drawing
+            if self.heatmap_open:
+                for ((i,j),rect) in self.matrix_cell_rects.items():
+                    # gets current interaction values out of config and prepares the string shown on cells
+                    config_value = self.system.config.get_interaction(i,j)
+                    config_color_value = config_value
+                    config_value = str(round(config_value,2))
+                    #  since RGB input only works if integer is positive and between 0-255 we normalise the Value between 0-1
+                    config_color_value = (config_color_value + 1) / 2
+                    # function for the red color, becomes larger when interaction value is larger
+                    rgb_value_1 = round((config_color_value * 255))
+                    # function for the blue part of the color, becomes smaller when interaction value is larger
+                    rgb_value_2 = round((255 * (1-config_color_value)))
+                    # Draws Heatmap with changing colors, aswell as display for each value in each cell
+                    pygame.draw.rect(panel_surface, (rgb_value_1, 0, rgb_value_2), rect)
+                    pygame.draw.rect(panel_surface, (30, 30, 30), rect, width=2)
+                    cell_text = self.small_font.render(config_value,False,(0,0,0))
+                    cell_text_rect = cell_text.get_rect()
+                    cell_text_rect = rect.center
+                    panel_surface.blit(cell_text, cell_text_rect)
+                    # draws "edge" around the selected cell to dispay a cell is clicked
+                    if (i,j) == self.selected_cell:
+                        pygame.draw.rect(panel_surface, (230, 230, 230), rect, width=3)
+
+                self.heat_slider.draw(panel_surface,self.small_font)   
+                self._draw_buttons(panel_surface)       
+                
         # finally blit panel to the main screen
         self.screen.blit(panel_surface, (self.panel_rect.x, self.panel_rect.y))
 
@@ -498,13 +593,16 @@ class Visualizer:
             label = self.small_font.render(text, True, (230, 230, 230))
             label_rect = label.get_rect(center=rect.center)
             surface.blit(label, label_rect.topleft)
-
-        draw_button(
-            self.play_button_rect,
-            "Pause" if self.simulation_running else "Play",
-        )
-        draw_button(self.reset_button_rect, "Reset")
-        draw_button(self.randomize_button_rect, "Randomize")
+        if not self.heatmap_open:
+            draw_button(
+                self.play_button_rect,
+                "Pause" if self.simulation_running else "Play",
+            )
+            draw_button(self.reset_button_rect, "Reset")
+            draw_button(self.randomize_button_rect, "Randomize")
+            draw_button(self.edit_button_rect, "Edit")
+        else: 
+            draw_button(self.back_button_rect, "Back")
 
     def _draw_info_block(self, surface: pygame.Surface, start_y: int) -> None:
         """
