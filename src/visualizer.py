@@ -153,6 +153,7 @@ class Visualizer:
         self.matrix_gap = 1
         self.grid_size = 4
         self.matrix_cell_rects = {}
+        self.color_order = ["red","green","yellow","blue"]
         
 
         pygame.init()
@@ -620,6 +621,30 @@ class Visualizer:
                     cell_text_rect = cell_text.get_rect()
                     cell_text_rect = rect.center
                     panel_surface.blit(cell_text, cell_text_rect)
+                    # text showing which color belongs to which row
+                    # starting positions for row and columns (x,y)
+                    row_text_x = self.matrix_origin[0] - 33
+                    row_text_y = self.matrix_origin[1] + 20
+                    column_text_x = self.matrix_origin[0] + 25
+                    column_text_y = self.matrix_origin[1] - 20
+                    # gap in between text is same as cell size
+                    gap = self.matrix_cell_size
+                    # enumerate because we need index and value of list (row_index and col_index because names i and j are used here)
+                    for row_index, color in enumerate(self.color_order):
+                        #very simple takes text out of list of colors, displays it on each row its used in
+                        cell_color_text = self.small_font.render(color,False,(255,255,255))
+                        color_text_rect = cell_color_text.get_rect()
+                        color_text_rect.topleft = (row_text_x ,row_text_y + (gap * row_index))
+                        panel_surface.blit(cell_color_text,color_text_rect)
+                    # this is the same loop as the one before
+                    for col_index, color in enumerate(self.color_order):
+                        cell_color_text = self.small_font.render(color,False,(255,255,255))
+                        color_text_rect = cell_color_text.get_rect()
+                        color_text_rect.topleft = (column_text_x + (gap * col_index),column_text_y)
+                        panel_surface.blit(cell_color_text,color_text_rect)
+
+
+
                     # draws "edge" around the selected cell to dispay a cell is clicked
                     if (i,j) == self.selected_cell:
                         pygame.draw.rect(panel_surface, (230, 230, 230), rect, width=3)
