@@ -383,6 +383,7 @@ class Visualizer:
                     config = self.system.config
                     (i, j) = self.selected_cell
                     config.set_interaction(i, j, self.heat_slider.value)
+                    self.system.matrix_dirty = True
 
         # handle simple mouse clicks
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -629,18 +630,18 @@ class Visualizer:
                     column_text_y = self.matrix_origin[1] - 20
                     # gap in between text is same as cell size
                     gap = self.matrix_cell_size
-                    # enumerate because we need index and value of list (row_index and col_index because names i and j are used here)
-                    for row_index, color in enumerate(self.color_order):
+                    # enumerate because we need index and value of list
+                    for row, color in enumerate(self.color_order):
                         #very simple takes text out of list of colors, displays it on each row its used in
                         cell_color_text = self.small_font.render(color,False,(255,255,255))
                         color_text_rect = cell_color_text.get_rect()
-                        color_text_rect.topleft = (row_text_x ,row_text_y + (gap * row_index))
+                        color_text_rect.topleft = (row_text_x ,row_text_y + (self.matrix_cell_size * row))
                         panel_surface.blit(cell_color_text,color_text_rect)
                     # this is the same loop as the one before
-                    for col_index, color in enumerate(self.color_order):
+                    for column, color in enumerate(self.color_order):
                         cell_color_text = self.small_font.render(color,False,(255,255,255))
                         color_text_rect = cell_color_text.get_rect()
-                        color_text_rect.topleft = (column_text_x + (gap * col_index),column_text_y)
+                        color_text_rect.topleft = (column_text_x + (self.matrix_cell_size * column),column_text_y)
                         panel_surface.blit(cell_color_text,color_text_rect)
 
 
