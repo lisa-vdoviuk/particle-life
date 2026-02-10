@@ -131,6 +131,8 @@ class ParticleSystem:
         # numpy-matrix cache
         self._numba_matrix_np = None
         self._numba_matrix_shape = None
+        #dirty-flag to check if interaction values changed
+        self.matrix_dirty = True
 
     def add_particles(self, count: int, types: List[int]):
         """Adds particles with positions and types"""
@@ -312,9 +314,10 @@ class ParticleSystem:
         mat_list = self.config.interaction_matrix.matrix
         shape = (len(mat_list), len(mat_list[0])) if len(mat_list) else (0, 0)
 
-        if self._numba_matrix_np is None or self._numba_matrix_shape != shape:
+        if self._numba_matrix_np is None or self._numba_matrix_shape != shape or self.matrix_dirty == True:
             self._numba_matrix_np = np.asarray(mat_list, dtype=np.float32)
             self._numba_matrix_shape = shape
+            self.matrix_dirty = False
 
         fx, fy = _compute_forces_numba(
             xs, ys, types, self._numba_matrix_np,
