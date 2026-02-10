@@ -29,7 +29,7 @@ pip install -r requirements.txt
 Start the application:
 
 ```bash
-python main.py
+python src/main.py
 ```
 
 At launch you can:
