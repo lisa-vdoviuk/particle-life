@@ -3,7 +3,7 @@ from simulation_config import SimulationConfig
 from particle_system import ParticleSystem
 from visualizer import Visualizer
 
-PRESETS_DIR = "presets"  # folder with JSON presets
+PRESETS_DIR = "src/presets"  # folder with JSON presets
 
 
 def configure_matrix_from_console(config: SimulationConfig) -> None:
