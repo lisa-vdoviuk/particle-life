@@ -18,8 +18,8 @@ if NUMBA_OK:
     def _compute_forces_numba(xs, ys, types, matrix, r, cell_size, width, height, cell_range):
         # uniform grid (spatial hashing) with a linked-list per cell:
         n = xs.shape[0]
-        beta = 0.35 # repulsion core size (larger -> fewer "solid" clumps)
-        force_scale = 0.04 # global force multiplier (like "alpha" in demos(project links with examples))
+        beta = 0.3 # Reduced slightly for better "ocean" flow
+        force_scale = 0.05 # Adjusted for stability
         fx = np.zeros(n, dtype=np.float32)
         fy = np.zeros(n, dtype=np.float32)
 
@@ -37,17 +37,18 @@ if NUMBA_OK:
         head = np.full(ncell, -1, dtype=np.int32)
         nxt = np.empty(n, dtype=np.int32)
 
-        half_w = 0.5 * width
-        half_h = 0.5 * height
-
         # build linked list per cell
         for i in range(n):
             cx = int(xs[i] * inv_cell)
             cy = int(ys[i] * inv_cell)
 
-            # wrap
-            cx %= nx
-            cy %= ny
+            # --- FIX: Removed grid wrapping ---
+            # Removed grid wrapping so instead of wrapping with %, I clamp the values to the edges
+            # This is needed because we added walls
+            if cx < 0: cx = 0
+            elif cx >= nx: cx = nx - 1
+            if cy < 0: cy = 0
+            elif cy >= ny: cy = ny - 1
 
             c = cx + cy * nx
             nxt[i] = head[c]
@@ -62,56 +63,48 @@ if NUMBA_OK:
             cxi = int(xi * inv_cell)
             cyi = int(yi * inv_cell)
 
-            # wrap neighbor cell coordinates (gx, gy) to stay inside grid
-            # iterate over neighboring cells (Moore neighborhood)
-            # cell_range is chosen so that all particles within radius r are covered
             for dx_cell in range(-cell_range, cell_range + 1):
                 gx = cxi + dx_cell
-                if gx < 0:
-                    gx += nx 
-                elif gx >= nx:
-                    gx -= nx
+                # --- FIX: Ignore cells outside walls ---
+                # Since the world isn't round anymore, we skip neighbor cells that don't exist
+                if gx < 0 or gx >= nx:
+                    continue
 
                 for dy_cell in range(-cell_range, cell_range + 1):
                     gy = cyi + dy_cell
-                    if gy < 0:
-                        gy += ny 
-                    elif gy >= ny:
-                        gy -= ny
-
+                    if gy < 0 or gy >= ny:
+                        continue
 
                     cell = gx + gy * nx
                     j = head[cell]
                     while j != -1:
                         if j != i:
-                            tj = types[j]
-                            k = matrix[ti, tj]
-                            if k != 0.0:
-                                # wrap dx/dy using half width/height so particles interact across borders correctly
-                                dx = xs[j] - xi
-                                dy = ys[j] - yi
-                                if dx > half_w:
-                                    dx -= width
-                                elif dx < -half_w:
-                                    dx += width
+                            # --- FIX: Removed distance wrapping ---
+                            # Deleted the code that calculated distance through the screen edges
+                            dx = xs[j] - xi
+                            dy = ys[j] - yi
+                            
+                            d2 = dx * dx + dy * dy
 
-                                if dy > half_h:
-                                    dy -= height
-                                elif dy < -half_h:
-                                    dy += height
-                                d2 = dx * dx + dy * dy
-
-                                if d2 > 1e-6 and d2 <= radius2:
-                                    inv_d = 1.0 / math.sqrt(d2)
-                                    dist = d2 * inv_d  # sqrt(d2)
-                                    q = dist / r # normalized distance
-                                    if q < beta: # linear repulsion (prevents collapse)
-                                        f = (q / beta) - 1.0
-                                    else:
-                                        f = (1.0 - q) / (1.0 - beta) # linear attraction/repulsion fading to zero at r
+                            if d2 > 1e-6 and d2 <= radius2:
+                                inv_d = 1.0 / math.sqrt(d2)
+                                dist = d2 * inv_d
+                                q = dist / r 
+                                
+                                # --- FIX: Better Collision Logic ---
+                                if q < beta: 
+                                    # This pushes particles apart even if their matrix interaction is 0
+                                    # Prevents particles from phasing through each others
+                                    strength = (q / beta - 1.0) * force_scale
+                                else:
+                                    tj = types[j]
+                                    k = matrix[ti, tj]
+                                    # Honestly found this formula online which makes it look more like liquid molecules than simple circles
+                                    f = (1.0 - abs(2.0 * q - 1.0 - beta) / (1.0 - beta))
                                     strength = k * f * force_scale
-                                    fx[i] += dx * inv_d * strength
-                                    fy[i] += dy * inv_d * strength
+
+                                fx[i] += dx * inv_d * strength
+                                fy[i] += dy * inv_d * strength
 
                         j = nxt[j]
 
@@ -175,9 +168,22 @@ class ParticleSystem:
                 rnd_change
             )
 
-            # keep particles inside the simulation area (wrap-around)
-            particle.position_x %= self.width
-            particle.position_y %= self.height
+            # --- FIX: Wall Bouncing ---
+            # Replaced the % wrap with simple bouncing logic
+            # Simply checks if particle hits the edge and reverses velocity
+            if particle.position_x < 0:
+                particle.position_x = 0
+                particle.velocity_x *= -1
+            elif particle.position_x > self.width:
+                particle.position_x = self.width
+                particle.velocity_x *= -1
+
+            if particle.position_y < 0:
+                particle.position_y = 0
+                particle.velocity_y *= -1
+            elif particle.position_y > self.height:
+                particle.position_y = self.height
+                particle.velocity_y *= -1
 
     # -------------------- PYTHON --------------------
     def _calculate_forces_python(self):
