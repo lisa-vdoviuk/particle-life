@@ -1,10 +1,6 @@
 import pytest
 import os
-import sys
 import pygame
-
-# Had to add 'src' to path manually because python couldn't find the modules from the tests folder
-sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
 
 # Found this online to make Pygame run without a monitor (Headless), otherwise CI crashes without a video card
 os.environ["SDL_VIDEODRIVER"] = "dummy"
