@@ -26,7 +26,7 @@ class InteractionMatrix:
 
 
 # Console Editor
-def console_editor():
+def console_editor(): # pragma: no cover
     """
     This function runs a small text-based tool to edit the matrix.
     It is separated from the class so it doesn't run during the actual simulation!!!
