@@ -1,5 +1,5 @@
 import pytest
-from interaction_matrix import InteractionMatrix
+from src.interaction_matrix import InteractionMatrix
 
 @pytest.fixture
 def matrix():
