@@ -1,4 +1,4 @@
 ﻿pygame==2.6.1
 numba==0.58.1
-
+pytest-cov
 

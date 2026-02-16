@@ -157,7 +157,7 @@ def main() -> None:
     types = list(range(config.num_types))
 
     
-    system.add_particles(count=1000, types=types)
+    system.add_particles(count=3000, types=types)
 
     visualizer = Visualizer(
         system,
