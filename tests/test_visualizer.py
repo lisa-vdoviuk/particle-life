@@ -5,9 +5,9 @@ import pygame
 # Found this online to make Pygame run without a monitor (Headless), otherwise CI crashes without a video card
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 
-from visualizer import Visualizer, Slider
-from particle_system import ParticleSystem
-from simulation_config import SimulationConfig
+from src.visualizer import Visualizer, Slider
+from src.particle_system import ParticleSystem
+from src.simulation_config import SimulationConfig
 
 @pytest.fixture
 def viz_system():

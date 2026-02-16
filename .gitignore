@@ -1,0 +1,42 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# pytest
+.pytest_cache/
+
+# coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+Lib/
+Scripts/
+
+# mypy / type checkers
+.mypy_cache/
+.dmypy.json
+
+# Ruff / flake8
+.ruff_cache/
+
+# build artifacts
+build/
+dist/
+*.egg-info/
+
+# virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
