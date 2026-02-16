@@ -1,5 +1,5 @@
 import pytest
-from simulation_config import SimulationConfig
+from src.simulation_config import SimulationConfig
 
 
 @pytest.mark.parametrize("value", [100,5,-1,-5,-100]) ###Tests for various numbers out of range if it does raise the error its supposed to

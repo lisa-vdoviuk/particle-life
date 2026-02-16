@@ -1,7 +1,7 @@
 import pytest
 import random
-from simulation_config import SimulationConfig
-from particle_system import ParticleSystem
+from src.simulation_config import SimulationConfig
+from src.particle_system import ParticleSystem
 
 @pytest.fixture
 def system():
