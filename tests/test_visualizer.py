@@ -49,7 +49,6 @@ def test_colors_are_loaded(viz_system):
 def test_pause_logic(viz_system):
     """Tests that the simulation_running boolean can be toggled correctly."""
     viz_system.simulation_running = True
-    assert viz_system.simulation_running is True
     
     viz_system.simulation_running = not viz_system.simulation_running
     assert viz_system.simulation_running is False
@@ -88,3 +87,44 @@ def test_matrix_cell_selection(viz_system):
     
     viz_system._handle_mouse_click((click_x, click_y))
     assert viz_system.selected_cell == (0, 0)
+
+def test_draw_methods(viz_system, monkeypatch):
+    """Smoke test to ensure draw methods run without crashing in all UI states."""
+    
+    # We replace Pygame's drawing tools with fakes that do nothing.
+    monkeypatch.setattr(pygame.draw, "circle", lambda *args, **kwargs: None)
+    monkeypatch.setattr(pygame.draw, "rect", lambda *args, **kwargs: None)
+    monkeypatch.setattr(pygame.display, "flip", lambda *args, **kwargs: None)
+    
+    # I tried patching blit but Pygame says it's read only. 
+    # It seems to work fine without the patch anyway.
+
+    try:
+        # 1. Test normal drawing
+        viz_system._draw()
+        
+        # 2. Test drawing with a particl selected
+        viz_system.selected_particle = Particle(100, 100, 0, 0, 0, "red")
+        viz_system._draw()
+        
+        # 3. Test drawing with the matrix heatmap open
+        viz_system.heatmap_open = True
+        viz_system._draw()
+        
+        # 4. Test drawing when the panel is collapsed
+        viz_system.panel_collapsed = True
+        viz_system._draw()
+        
+    except Exception as e:
+        pytest.fail(f"Draw logic crashed: {e}")
+
+def test_resize_event(viz_system):
+    """Verifies that surfaces are recreated when the window is resized."""
+    new_w, new_h = 1000, 800
+    event = pygame.event.Event(pygame.VIDEORESIZE, size=(new_w, new_h), w=new_w, h=new_h)
+    pygame.event.post(event)
+    
+    viz_system._handle_events()
+    
+    assert viz_system.width == 1000
+    assert viz_system.height == 800
