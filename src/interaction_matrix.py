@@ -1,7 +1,9 @@
 import random
 
 class InteractionMatrix:
+    """Manages the 2D matrix of interaction forces between particle types."""
     def __init__(self, num_types):
+        """Initializes a matrix of a given size, filled with zeros."""
         self.num_types = num_types
         self.matrix = []
         for i in range(num_types):
@@ -11,15 +13,18 @@ class InteractionMatrix:
             self.matrix.append(row)
 
     def set_interaction(self, type1, type2, value):
+        """Sets the interaction force from type1 to type2."""
         if 0 <= type1 < self.num_types and 0 <= type2 < self.num_types:
             self.matrix[type1][type2] = value
 
     def get_interaction(self, type1, type2):
+        """Gets the interaction force from type1 to type2, returning 0.0 if out of bounds."""
         if 0 <= type1 < self.num_types and 0 <= type2 < self.num_types:
             return self.matrix[type1][type2]
         return 0.0
 
     def randomize(self):
+        """Fills the entire matrix with random values between -1.0 and 1.0."""
         for i in range(self.num_types):
             for j in range(self.num_types):
                 self.matrix[i][j] = random.uniform(-1.0, 1.0)
@@ -28,8 +33,8 @@ class InteractionMatrix:
 # Console Editor
 def console_editor(): # pragma: no cover
     """
-    This function runs a small text-based tool to edit the matrix.
-    It is separated from the class so it doesn't run during the actual simulation!!!
+    Runs a small text-based tool to edit the matrix.
+    Separated from the class so it doesn't run during the actual simulation.
     """
     print("--- Interaction Matrix Editor ---")
     matrix = InteractionMatrix(4)
