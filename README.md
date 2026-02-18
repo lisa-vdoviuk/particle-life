@@ -47,10 +47,10 @@ After configuration, the visualization window opens automatically.
 ```mermaid
 ---
 config:
-  layout: dagre
+  layout: fixed
 ---
 flowchart TB
-    Main["main.py Entry Point"] --> PS["**ParticleSystem**
+    Main["main.py<br>• Entry Point"] --> PS["**ParticleSystem**
 • update_system()
 • calculate_forces()
 • Grid search logic"] & Config["**SimulationConfig**
