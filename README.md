@@ -44,7 +44,27 @@ After configuration, the visualization window opens automatically.
 
 ## System Architecture
 
-...
+```mermaid
+---
+config:
+  layout: fixed
+---
+flowchart TB
+    Main["main.py<br>• Entry Point"] --> PS["**ParticleSystem**
+• update_system()
+• calculate_forces()
+• Grid search logic"] & Config["**SimulationConfig**
+• Physics Parameters
+• JSON Save/Load
+• Interaction Rules"] & Viz["**Visualizer**
+• Pygame rendering
+• UI Control Panel
+• Matrix Heatmap"]
+    PS --> PC["Particle Class"] & Matrix["InteractionMatrix"]
+    Viz -. Updates Params .-> Config
+    Config -. Provides Data .-> PS
+    PS -. Provides Data .-> Viz
+```
 
 ## Simulation Flow
 
