@@ -14,7 +14,7 @@ except Exception:
 
 if NUMBA_OK:
     @njit(fastmath=True, cache=True)
-    def _compute_forces_numba(xs, ys, types, matrix, r, cell_size, width, height, cell_range, beta, force_scale):
+    def _compute_forces_numba(xs, ys, types, matrix, r, cell_size, width, height, cell_range, beta, force_scale): # pragma: no cover
         # uniform grid (spatial hashing) with a linked-list per cell:
         n = xs.shape[0]
         fx = np.zeros(n, dtype=np.float32)

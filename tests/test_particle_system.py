@@ -2,7 +2,12 @@ import pytest
 import random
 from src.simulation_config import SimulationConfig
 from src.particle_system import ParticleSystem
-from src.particle_system import NUMBA_OK
+try:
+    import numpy as np
+    from numba import njit
+    NUMBA_OK = True
+except Exception:
+    NUMBA_OK = False
 
 @pytest.fixture
 def system():
@@ -131,3 +136,28 @@ def test_no_interaction_means_no_velocity_change(system):
 
     assert p1.velocity_x == 0.0 and p1.velocity_y == 0.0
     assert p2.velocity_x == 0.0 and p2.velocity_y == 0.0
+
+
+def test_calculate_forces_raises_without_numba(system, monkeypatch):
+    # raise RuntimeError, when NUMBA_OK=False
+    monkeypatch.setattr("src.particle_system.NUMBA_OK", False, raising=False)
+    system.add_particles(1, types=[0])
+    with pytest.raises(RuntimeError):
+        system.calculate_forces(1.0)
+
+def test_calculate_forces_python_moves_velocity(system):
+    # 193-281 (_calculate_forces_python)
+    system.add_particles(2, types=[0])
+    p1, p2 = system.particles[0], system.particles[1]
+
+    p1.position_x, p1.position_y = 10.0, 10.0
+    p2.position_x, p2.position_y = 20.0, 10.0
+
+    p1.velocity_x = p1.velocity_y = 0.0
+    p2.velocity_x = p2.velocity_y = 0.0
+
+    system.config.set_interaction(0, 0, 1.0)
+
+    system._calculate_forces_python()
+
+    assert (p1.velocity_x != 0.0) or (p2.velocity_x != 0.0)
