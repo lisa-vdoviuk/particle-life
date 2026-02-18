@@ -15,7 +15,7 @@ except Exception:
 
 if NUMBA_OK:
     @njit(fastmath=True, cache=True)
-    def _compute_forces_numba(xs, ys, types, matrix, r, cell_size, width, height, cell_range):
+    def _compute_forces_numba(xs, ys, types, matrix, r, cell_size, width, height, cell_range): # pragma: no cover
         # uniform grid (spatial hashing) with a linked-list per cell:
         n = xs.shape[0]
         beta = 0.35 # repulsion core size (larger -> fewer "solid" clumps)
