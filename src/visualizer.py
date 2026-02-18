@@ -215,7 +215,7 @@ class Visualizer:
         slider_height = 16
         slider_spacing = 46
         slider_rects: list[pygame.Rect] = []
-        for i in range(3):  # currently 3 sliders are used in UI
+        for i in range(5):  # currently 3 sliders are used in UI
             r = pygame.Rect(
                 16,
                 slider_start_y + i * slider_spacing,
@@ -248,7 +248,23 @@ class Visualizer:
                 0.0,
                 0.2,
                 config.random_motion,
-            )   
+            ),
+            Slider(
+                "Beta",
+                "beta",
+                slider_rects[3],
+                0.1,
+                0.5,
+                config.beta,
+            ),
+            Slider(
+                "Force Scale",
+                "force_scale",
+                slider_rects[4],
+                0.05,
+                0.4,
+                config.force_scale,
+            )
             # If you want Friction slider back, add one more rect and here:
             # Slider("Friction", "friction", slider_rects[3], 0.0, 0.2, config.friction),
         ]

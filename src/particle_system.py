@@ -3,7 +3,6 @@ from simulation_config import SimulationConfig
 from typing import List, Dict
 import random
 import math
-
 # -------------------- NUMBA ADD-ON (optional acceleration) --------------------
 # Numba accelerates the hot loop (neighbor search + pairwise forces)
 try:
@@ -15,11 +14,9 @@ except Exception:
 
 if NUMBA_OK:
     @njit(fastmath=True, cache=True)
-    def _compute_forces_numba(xs, ys, types, matrix, r, cell_size, width, height, cell_range): # pragma: no cover
+    def _compute_forces_numba(xs, ys, types, matrix, r, cell_size, width, height, cell_range, beta, force_scale): # pragma: no cover
         # uniform grid (spatial hashing) with a linked-list per cell:
         n = xs.shape[0]
-        beta = 0.35 # repulsion core size (larger -> fewer "solid" clumps)
-        force_scale = 0.04 # global force multiplier (like "alpha" in demos(project links with examples))
         fx = np.zeros(n, dtype=np.float32)
         fy = np.zeros(n, dtype=np.float32)
 
@@ -45,9 +42,9 @@ if NUMBA_OK:
             cx = int(xs[i] * inv_cell)
             cy = int(ys[i] * inv_cell)
 
-            # wrap
-            cx %= nx
-            cy %= ny
+            # wrap cell coords
+            cx = cx % nx
+            cy = cy % ny
 
             c = cx + cy * nx
             nxt[i] = head[c]
@@ -62,9 +59,6 @@ if NUMBA_OK:
             cxi = int(xi * inv_cell)
             cyi = int(yi * inv_cell)
 
-            # wrap neighbor cell coordinates (gx, gy) to stay inside grid
-            # iterate over neighboring cells (Moore neighborhood)
-            # cell_range is chosen so that all particles within radius r are covered
             for dx_cell in range(-cell_range, cell_range + 1):
                 gx = cxi + dx_cell
                 if gx < 0:
@@ -84,34 +78,40 @@ if NUMBA_OK:
                     j = head[cell]
                     while j != -1:
                         if j != i:
-                            tj = types[j]
-                            k = matrix[ti, tj]
-                            if k != 0.0:
-                                # wrap dx/dy using half width/height so particles interact across borders correctly
-                                dx = xs[j] - xi
-                                dy = ys[j] - yi
-                                if dx > half_w:
-                                    dx -= width
-                                elif dx < -half_w:
-                                    dx += width
+                            # wrap dx/dy using half width/height so particles interact across borders correctly
+                            dx = xs[j] - xi
+                            dy = ys[j] - yi
+                            if dx > half_w:
+                                dx -= width
+                            elif dx < -half_w:
+                                dx += width
 
-                                if dy > half_h:
-                                    dy -= height
-                                elif dy < -half_h:
-                                    dy += height
-                                d2 = dx * dx + dy * dy
+                            if dy > half_h:
+                                dy -= height
+                            elif dy < -half_h:
+                                dy += height
 
-                                if d2 > 1e-6 and d2 <= radius2:
-                                    inv_d = 1.0 / math.sqrt(d2)
-                                    dist = d2 * inv_d  # sqrt(d2)
-                                    q = dist / r # normalized distance
-                                    if q < beta: # linear repulsion (prevents collapse)
-                                        f = (q / beta) - 1.0
-                                    else:
-                                        f = (1.0 - q) / (1.0 - beta) # linear attraction/repulsion fading to zero at r
-                                    strength = k * f * force_scale
-                                    fx[i] += dx * inv_d * strength
-                                    fy[i] += dy * inv_d * strength
+                            d2 = dx * dx + dy * dy
+
+                            if d2 > 1e-6 and d2 <= radius2:
+                                inv_d = 1.0 / math.sqrt(d2)
+                                dist = d2 * inv_d  # sqrt(d2)
+                                q = dist / r # normalized distance
+
+                                #COLLISION                                    
+                                if q < beta: # core repulsion for q < beta (ignores matrix)
+                                    strength = (q / beta - 1.0) * force_scale
+                                else:
+                                        tj = types[j]
+                                        k = matrix[ti, tj]
+                                        if k == 0.0:
+                                            j = nxt[j]
+                                            continue
+                                    # 2) "liquid/molecule" shaped interaction
+                                        f = 1.0 - abs(2.0 * q - 1.0 - beta) / (1.0 - beta)
+                                        strength = k * f * force_scale
+                                fx[i] += dx * inv_d * strength
+                                fy[i] += dy * inv_d * strength
 
                         j = nxt[j]
 
@@ -175,7 +175,7 @@ class ParticleSystem:
                 rnd_change
             )
 
-            # keep particles inside the simulation area (wrap-around)
+           # WRAP-AROUND POSITION
             particle.position_x %= self.width
             particle.position_y %= self.height
 
@@ -323,7 +323,8 @@ class ParticleSystem:
             xs, ys, types, self._numba_matrix_np,
             float(r), float(cell_size),
             int(self.width), int(self.height),
-            int(cell_range)
+            int(cell_range),float(self.config.beta),
+            float(self.config.force_scale),
         )
 
         # apply forces back

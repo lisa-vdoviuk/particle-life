@@ -37,6 +37,8 @@ class SimulationConfig:
     max_velocity: float = 3.0
     interaction_radius: float = 50.0
     random_motion: float = 0.01
+    beta: float = 0.3
+    force_scale: float = 0.15
 
     particle_colors: List[str] = field(default_factory=list)
     interaction_matrix: InteractionMatrix = field(init=False)
@@ -102,6 +104,9 @@ class SimulationConfig:
             "random_motion": self.random_motion,
             "particle_colors": self.particle_colors,
             "interaction_matrix": self.interaction_matrix.matrix,
+            "beta": self.beta,
+            "force_scale": self.force_scale
+
         }
     
     @classmethod
@@ -116,6 +121,8 @@ class SimulationConfig:
             interaction_radius=float(data.get("interaction_radius", 50.0)),
             random_motion=float(data.get("random_motion", 0.01)),
             particle_colors=list(data.get("particle_colors", [])),
+            beta=float(data.get("beta", 0.3)),
+            force_scale=float(data.get("force_scale", 0.15)),
         )
 
         matrix_data = data.get("interaction_matrix")
