@@ -191,6 +191,8 @@ or with html report
 ```bash
 pytest --cov=src --cov-report=html
 ```
+Coverage report:
+<img width="942" height="487" alt="image" src="https://github.com/user-attachments/assets/af3be747-34b3-4eff-8ca1-dcf4b9ac0e2e" />
 
 Continuous integration is configured via GitHub Actions.
 
