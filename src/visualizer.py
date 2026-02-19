@@ -174,13 +174,13 @@ class Visualizer:
 
         self._circle_cache: dict[tuple[int, int], pygame.Surface] = {}
         self._frame = 0
-        self.fade_every_n_frames = 3
+        self.fade_every_n_frames = 1
 
         # surfaces used for trails effect
         self.trail_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         self.fade_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         # slightly transparent black, used to slowly fade old trails
-        self.fade_surface.fill((0, 0, 0, 20))
+        self.fade_surface.fill((0, 0, 0, 40))
 
         # for reset: remember initial particle count and types
         self.initial_particle_count = len(self.system.particles)
@@ -365,7 +365,7 @@ class Visualizer:
                 self.trail_surface = pygame.Surface((w, h), pygame.SRCALPHA)
                 # recreates fade surface used to fade old frames
                 self.fade_surface = pygame.Surface((w, h), pygame.SRCALPHA)
-                self.fade_surface.fill((0, 0, 0, 20))
+                self.fade_surface.fill((0, 0, 0, 40))
 
             if event.type in (
                 pygame.MOUSEBUTTONDOWN,
